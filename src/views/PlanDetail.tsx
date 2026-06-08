@@ -1,13 +1,5 @@
 import { useState } from "react";
-import {
-  ArrowLeft,
-  Plus,
-  Zap,
-  Trash2,
-  ChevronRight,
-  Dumbbell,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Plus, Zap, Trash2, ChevronRight, X } from "lucide-react";
 import { usePlan, usePlans } from "../hooks/usePlans";
 import type { GoFn, CreateRoutinePayload } from "../types";
 
@@ -16,20 +8,20 @@ interface Props {
   planId: string;
 }
 
-// ── Responsive Modal ──────────────────────────────────────────────────────────
-// Mobile  → slides up from bottom (sheet)
-// Tablet+ → centered dialog (sm:max-w-md)
+// ── Modal ─────────────────────────────────────────────────────────────────────
 
-interface ModalProps {
+function Modal({
+  title,
+  onClose,
+  children,
+}: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
-}
-
-function Modal({ title, onClose, children }: ModalProps) {
+}) {
   return (
     <div
-      className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
@@ -37,12 +29,12 @@ function Modal({ title, onClose, children }: ModalProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">{title}</h2>
+          <h2 className="text-base font-semibold text-white">{title}</h2>
           <button
             className="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
             onClick={onClose}
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
         {children}
@@ -53,13 +45,15 @@ function Modal({ title, onClose, children }: ModalProps) {
 
 // ── Add routine modal ─────────────────────────────────────────────────────────
 
-interface AddRoutineModalProps {
+function AddRoutineModal({
+  planId,
+  onSave,
+  onClose,
+}: {
   planId: string;
   onSave: (planId: string, payload: CreateRoutinePayload) => Promise<unknown>;
   onClose: () => void;
-}
-
-function AddRoutineModal({ planId, onSave, onClose }: AddRoutineModalProps) {
+}) {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -84,26 +78,26 @@ function AddRoutineModal({ planId, onSave, onClose }: AddRoutineModalProps) {
     <Modal title="Nueva rutina" onClose={onClose}>
       {err && <p className="text-sm text-red-400">{err}</p>}
       <input
-        className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        placeholder="Nombre de la rutina"
+        className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        placeholder="Ej. Lunes — Pecho y Tríceps"
         value={name}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && handleSave()}
         autoFocus
       />
-      <div className="flex gap-3 pt-1">
+      <div className="flex gap-3">
         <button
-          className="flex-1 py-3 rounded-xl border border-gray-600 text-sm text-gray-300 font-medium hover:bg-gray-700 transition-colors"
+          className="flex-1 py-2.5 rounded-xl border border-gray-600 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
           onClick={onClose}
         >
           Cancelar
         </button>
         <button
-          className="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+          className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium disabled:opacity-50 transition-colors"
           onClick={handleSave}
           disabled={saving}
         >
-          {saving ? "Guardando…" : "Crear rutina"}
+          {saving ? "Guardando…" : "Crear"}
         </button>
       </div>
     </Modal>
@@ -117,15 +111,14 @@ export function PlanDetailView({ go, planId }: Props) {
   const { activatePlan, removePlan, createRoutine, removeRoutine } = usePlans();
   const [showAddRoutine, setShowAddRoutine] = useState(false);
 
-  if (loading) {
+  if (loading)
     return (
       <div className="flex items-center justify-center py-20 text-gray-400 text-sm">
         Cargando…
       </div>
     );
-  }
 
-  if (error || !plan) {
+  if (error || !plan)
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <p className="text-gray-400 text-sm">{error ?? "Plan no encontrado"}</p>
@@ -137,105 +130,143 @@ export function PlanDetailView({ go, planId }: Props) {
         </button>
       </div>
     );
-  }
+
+  const routines = plan.routines ?? [];
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-5">
+      {/* Back */}
       <button
         className="flex items-center gap-1.5 text-gray-400 text-sm hover:text-white transition-colors"
         onClick={() => go("plans")}
       >
-        <ArrowLeft size={16} /> Planes
+        <ArrowLeft size={15} /> Planes
       </button>
 
+      {/* Plan header card */}
       <div className="bg-gray-800 rounded-2xl border border-gray-700 p-4 space-y-3">
-        <div>
-          {plan.active && (
-            <span className="inline-block text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 mb-2">
-              Activo
-            </span>
-          )}
-          <h1 className="text-xl font-bold text-white">{plan.name}</h1>
-          <p className="text-xs text-gray-500 mt-1">{plan.created_at}</p>
-        </div>
-        <div className="flex items-center gap-1 text-xs text-gray-400">
-          <Dumbbell size={11} />
-          <span>{(plan.routines ?? []).length} rutinas</span>
-        </div>
-        <div className="flex gap-2">
-          {!plan.active && (
+        {/* Name + actions row */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-bold text-white leading-tight truncate">
+              {plan.name}
+            </h1>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs text-gray-500">{plan.created_at}</span>
+              <span className="text-gray-700">·</span>
+              <span className="text-xs text-gray-500">
+                {routines.length} {routines.length === 1 ? "rutina" : "rutinas"}
+              </span>
+              {plan.active && (
+                <>
+                  <span className="text-gray-700">·</span>
+                  <span className="text-xs text-emerald-400 font-medium">
+                    Activo
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Icon actions */}
+          <div className="flex items-center gap-1 shrink-0">
+            {!plan.active && (
+              <button
+                title="Activar plan"
+                className="p-2 rounded-lg text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                onClick={() => activatePlan(plan.id)}
+              >
+                <Zap size={15} />
+              </button>
+            )}
             <button
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 transition-colors"
-              onClick={() => activatePlan(plan.id)}
+              title="Eliminar plan"
+              className="p-2 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              onClick={async () => {
+                await removePlan(plan.id);
+                go("plans");
+              }}
             >
-              <Zap size={13} /> Activar plan
+              <Trash2 size={15} />
             </button>
-          )}
-          <button
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors"
-            onClick={async () => {
-              await removePlan(plan.id);
-              go("plans");
-            }}
-          >
-            <Trash2 size={13} /> Eliminar
-          </button>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-300">Rutinas</h2>
+      {/* Routines section */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            Rutinas
+          </h2>
           <button
             className="flex items-center gap-1 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
             onClick={() => setShowAddRoutine(true)}
           >
-            <Plus size={14} /> Agregar
+            <Plus size={13} /> Agregar
           </button>
         </div>
 
-        {(plan.routines ?? []).length === 0 ? (
-          <div className="text-center py-10 bg-gray-800 rounded-2xl border border-gray-700">
-            <p className="text-gray-400 text-sm mb-3">
-              Este plan no tiene rutinas
-            </p>
+        {routines.length === 0 ? (
+          <div className="text-center py-10 bg-gray-800 rounded-2xl border border-gray-700 border-dashed">
+            <p className="text-gray-500 text-sm mb-3">Sin rutinas aún</p>
             <button
-              className="text-sm font-medium text-indigo-400 underline underline-offset-2"
+              className="text-xs font-medium text-indigo-400 hover:text-indigo-300 underline underline-offset-2 transition-colors"
               onClick={() => setShowAddRoutine(true)}
             >
               Agregar primera rutina
             </button>
           </div>
         ) : (
-          (plan.routines ?? []).map((routine) => (
-            <div
-              key={routine.id}
-              className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden"
-            >
+          <div className="bg-gray-800 rounded-2xl border border-gray-700 divide-y divide-gray-700/60 overflow-hidden">
+            {routines.map((routine, idx) => (
               <div
-                className="w-full text-left p-4 flex items-center justify-between cursor-pointer hover:bg-gray-700/50 transition-colors"
-                onClick={() =>
-                  go("routineDetail", {
-                    planId: plan.id,
-                    routineId: routine.id,
-                  })
-                }
+                key={routine.id}
+                className="flex items-center gap-3 px-4 py-3 group hover:bg-gray-700/30 transition-colors"
               >
-                <p className="font-medium text-white truncate">
-                  {routine.name}
-                </p>
-                <ChevronRight size={16} className="text-gray-600 shrink-0" />
-              </div>
-              <div className="border-t border-gray-700">
-                <button
-                  className="w-full py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors"
-                  onClick={() => removeRoutine(plan.id, routine.id)}
+                {/* Index */}
+                <span className="text-xs font-mono text-gray-600 w-4 shrink-0">
+                  {idx + 1}
+                </span>
+
+                {/* Name → navigate */}
+                <div
+                  className="flex-1 min-w-0 cursor-pointer"
+                  onClick={() =>
+                    go("routineDetail", {
+                      planId: plan.id,
+                      routineId: routine.id,
+                    })
+                  }
                 >
-                  Eliminar rutina
-                </button>
+                  <p className="text-sm font-medium text-white truncate">
+                    {routine.name}
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button
+                    className="p-1.5 text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 rounded-lg transition-all"
+                    onClick={() => removeRoutine(plan.id, routine.id)}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                  <div
+                    className="p-1.5 cursor-pointer"
+                    onClick={() =>
+                      go("routineDetail", {
+                        planId: plan.id,
+                        routineId: routine.id,
+                      })
+                    }
+                  >
+                    <ChevronRight size={15} className="text-gray-600" />
+                  </div>
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
 
