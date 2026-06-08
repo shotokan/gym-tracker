@@ -3,7 +3,6 @@ import { plansService } from "../services/plans.service";
 import type {
   Plan,
   CreatePlanPayload,
-  UpdatePlanPayload,
   CreateRoutinePayload,
   UpdateRoutinePayload,
 } from "../types";
@@ -30,40 +29,21 @@ export function usePlans() {
     fetchPlans();
   }, [fetchPlans]);
 
-  // ── Plan operations ────────────────────────────────────────────────────────
-
   const createPlan = async (payload: CreatePlanPayload): Promise<Plan> => {
     const plan = await plansService.create(payload);
     setPlans((prev) => [...prev, plan]);
     return plan;
   };
 
-  const updatePlan = async (
-    id: string,
-    payload: UpdatePlanPayload,
-  ): Promise<Plan> => {
-    const updated = await plansService.update(id, payload);
-    setPlans((prev) => prev.map((p) => (p.id === id ? updated : p)));
-    return updated;
-  };
-
   const activatePlan = async (id: string): Promise<void> => {
     await plansService.activate(id);
-    // Mark all others inactive locally — avoids a full refetch
-    setPlans((prev) =>
-      prev.map((p) => ({
-        ...p,
-        status: p.id === id ? ("active" as const) : ("inactive" as const),
-      })),
-    );
+    setPlans((prev) => prev.map((p) => ({ ...p, active: p.id === id })));
   };
 
   const removePlan = async (id: string): Promise<void> => {
     await plansService.remove(id);
     setPlans((prev) => prev.filter((p) => p.id !== id));
   };
-
-  // ── Routine operations ─────────────────────────────────────────────────────
 
   const createRoutine = async (
     planId: string,
@@ -72,7 +52,9 @@ export function usePlans() {
     const routine = await plansService.createRoutine(planId, payload);
     setPlans((prev) =>
       prev.map((p) =>
-        p.id === planId ? { ...p, routines: [...p.routines, routine] } : p,
+        p.id === planId
+          ? { ...p, routines: [...(p.routines ?? []), routine] }
+          : p,
       ),
     );
     return routine;
@@ -123,7 +105,6 @@ export function usePlans() {
     error,
     fetchPlans,
     createPlan,
-    updatePlan,
     activatePlan,
     removePlan,
     createRoutine,
@@ -131,8 +112,6 @@ export function usePlans() {
     removeRoutine,
   };
 }
-
-// ── Single plan helper ─────────────────────────────────────────────────────────
 
 export function usePlan(planId: string | undefined) {
   const [plan, setPlan] = useState<Plan | null>(null);

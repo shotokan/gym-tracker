@@ -1,63 +1,31 @@
 // ── Plan domain ──────────────────────────────────────────────────────────────
 
-export type PlanStatus = "active" | "inactive" | "draft";
-
-export interface Exercise {
-  id: string;
-  name: string;
-  sets: number;
-  reps: number;
-  weight: number | null; // kg, optional
-  notes: string | null;
-}
-
 export interface Routine {
   id: string;
   name: string;
-  day_of_week: number; // 1=Mon … 7=Sun, 0=any
-  exercises: Exercise[];
-  created_at: string;
 }
 
 export interface Plan {
   id: string;
-  user_id: string;
   name: string;
-  description: string;
-  days_per_week: number;
-  duration_weeks: number;
-  status: PlanStatus;
-  routines: Routine[];
+  active: boolean;
   created_at: string;
-  updated_at: string;
+  routines: Routine[];
 }
 
 // ── Plan payloads ─────────────────────────────────────────────────────────────
 
 export interface CreatePlanPayload {
   name: string;
-  description?: string;
-  days_per_week?: number;
-  duration_weeks?: number;
 }
-
 export interface UpdatePlanPayload {
-  name?: string;
-  description?: string;
-  days_per_week?: number;
-  duration_weeks?: number;
+  name: string;
 }
-
 export interface CreateRoutinePayload {
   name: string;
-  day_of_week?: number;
-  exercises?: Omit<Exercise, "id">[];
 }
-
 export interface UpdateRoutinePayload {
-  name?: string;
-  day_of_week?: number;
-  exercises?: Omit<Exercise, "id">[];
+  name: string;
 }
 
 // ── Session domain ────────────────────────────────────────────────────────────
@@ -105,5 +73,4 @@ export interface NavParams {
   planId?: string;
   routineId?: string;
 }
-
 export type GoFn = (view: AppView, params?: NavParams) => void;
