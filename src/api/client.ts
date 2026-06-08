@@ -14,11 +14,14 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
-// On 401, clear the stored token and redirect to login.
+// On 401, clear the token and redirect to login — BUT only for protected routes.
+// A 401 on /auth/login means wrong credentials, not an expired session,
+// so we let the login handler show the error without redirecting.
 client.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const isAuthRequest = err.config?.url?.includes("/auth/");
+    if (err.response?.status === 401 && !isAuthRequest) {
       sessionStorage.removeItem("token");
       window.location.href = "/";
     }
