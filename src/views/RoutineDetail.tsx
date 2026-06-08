@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { ArrowLeft, Plus, Trash2, Save, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
 import { usePlan, usePlans } from "../hooks/usePlans";
-import type { GoFn, Exercise, Routine } from "../types";
+import type { GoFn } from "../types";
 
 interface Props {
   go: GoFn;
@@ -9,63 +9,86 @@ interface Props {
   routineId: string;
 }
 
-// ── Exercise row (inline edit) ────────────────────────────────────────────────
+// Exercise exists only as local UI state — not yet persisted in the API
+interface Exercise {
+  name: string;
+  sets: number;
+  reps: number;
+  weight: number | null;
+  notes: string | null;
+}
+
+const emptyExercise = (): Exercise => ({
+  name: "",
+  sets: 3,
+  reps: 10,
+  weight: null,
+  notes: null,
+});
+
+// ── Exercise row ──────────────────────────────────────────────────────────────
 
 interface ExerciseRowProps {
-  exercise: Omit<Exercise, "id">;
-  onChange: (
-    field: keyof Omit<Exercise, "id">,
-    value: string | number | null,
-  ) => void;
+  exercise: Exercise;
+  index: number;
+  onChange: (field: keyof Exercise, value: string | number | null) => void;
   onDelete: () => void;
 }
 
-function ExerciseRow({ exercise, onChange, onDelete }: ExerciseRowProps) {
+function ExerciseRow({
+  exercise,
+  index,
+  onChange,
+  onDelete,
+}: ExerciseRowProps) {
   return (
-    <div className="bg-white border border-zinc-100 rounded-2xl p-4 space-y-3">
+    <div className="bg-gray-800 border border-gray-700 rounded-2xl p-4 space-y-3">
       <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-500 font-mono w-5 shrink-0">
+          {index + 1}.
+        </span>
         <input
-          className="flex-1 border border-zinc-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300"
-          placeholder="Nombre del ejercicio *"
+          className="flex-1 bg-gray-700 border border-gray-600 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="Nombre del ejercicio"
           value={exercise.name}
           onChange={(e) => onChange("name", e.target.value)}
         />
         <button
-          className="p-2 text-red-400 hover:bg-red-50 rounded-xl shrink-0"
+          className="p-2 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors shrink-0"
           onClick={onDelete}
         >
           <Trash2 size={15} />
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2 pl-7">
         <div>
-          <label className="text-xs text-zinc-400 mb-1 block">Series</label>
+          <label className="text-xs text-gray-500 mb-1 block">Series</label>
           <input
             type="number"
             min={1}
-            className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-zinc-300"
+            className="w-full bg-gray-700 border border-gray-600 rounded-xl px-3 py-2 text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-indigo-500"
             value={exercise.sets}
             onChange={(e) => onChange("sets", Number(e.target.value))}
           />
         </div>
         <div>
-          <label className="text-xs text-zinc-400 mb-1 block">Reps</label>
+          <label className="text-xs text-gray-500 mb-1 block">Reps</label>
           <input
             type="number"
             min={1}
-            className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-zinc-300"
+            className="w-full bg-gray-700 border border-gray-600 rounded-xl px-3 py-2 text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-indigo-500"
             value={exercise.reps}
             onChange={(e) => onChange("reps", Number(e.target.value))}
           />
         </div>
         <div>
-          <label className="text-xs text-zinc-400 mb-1 block">Peso (kg)</label>
+          <label className="text-xs text-gray-500 mb-1 block">Peso kg</label>
           <input
             type="number"
             min={0}
             step={0.5}
-            className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-zinc-300"
+            className="w-full bg-gray-700 border border-gray-600 rounded-xl px-3 py-2 text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-indigo-500"
             placeholder="—"
             value={exercise.weight ?? ""}
             onChange={(e) =>
@@ -76,7 +99,8 @@ function ExerciseRow({ exercise, onChange, onDelete }: ExerciseRowProps) {
       </div>
 
       <input
-        className="w-full border border-zinc-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-300"
+        className="bg-gray-700 border border-gray-600 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        style={{ marginLeft: "1.75rem", width: "calc(100% - 1.75rem)" }}
         placeholder="Notas (opcional)"
         value={exercise.notes ?? ""}
         onChange={(e) => onChange("notes", e.target.value || null)}
@@ -85,78 +109,52 @@ function ExerciseRow({ exercise, onChange, onDelete }: ExerciseRowProps) {
   );
 }
 
-type DraftExercise = Omit<Exercise, "id">;
-
-const emptyExercise = (): DraftExercise => ({
-  name: "",
-  sets: 3,
-  reps: 10,
-  weight: null,
-  notes: null,
-});
-
 // ── Main view ─────────────────────────────────────────────────────────────────
 
 export function RoutineDetailView({ go, planId, routineId }: Props) {
   const { plan, loading, error } = usePlan(planId);
   const { updateRoutine } = usePlans();
 
-  const routine: Routine | undefined = plan?.routines.find(
-    (r) => r.id === routineId,
-  );
+  const routine = plan?.routines.find((r) => r.id === routineId);
 
-  // Local draft of exercises — saved explicitly by the user
-  const [exercises, setExercises] = useState<DraftExercise[]>(
-    () => routine?.exercises.map(({ id: _id, ...rest }) => rest) ?? [],
-  );
+  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [routineName, setRoutineName] = useState(routine?.name ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
 
-  // Sync when routine loads
-  if (
-    routine &&
-    exercises.length === 0 &&
-    routine.exercises.length > 0 &&
-    !saving
-  ) {
-    setExercises(routine.exercises.map(({ id: _id, ...rest }) => rest));
-    setRoutineName(routine.name);
-  }
+  // Sync name when routine loads
+  if (routine && !routineName) setRoutineName(routine.name);
 
-  const addExercise = () => setExercises((prev) => [...prev, emptyExercise()]);
-
+  const addExercise = () => {
+    setExercises((p) => [...p, emptyExercise()]);
+    setSaved(false);
+  };
+  const deleteExercise = (idx: number) => {
+    setExercises((p) => p.filter((_, i) => i !== idx));
+    setSaved(false);
+  };
   const updateExercise = (
     idx: number,
-    field: keyof DraftExercise,
+    field: keyof Exercise,
     value: string | number | null,
   ) => {
-    setExercises((prev) =>
-      prev.map((ex, i) => (i === idx ? { ...ex, [field]: value } : ex)),
+    setExercises((p) =>
+      p.map((ex, i) => (i === idx ? { ...ex, [field]: value } : ex)),
     );
     setSaved(false);
   };
 
-  const deleteExercise = (idx: number) => {
-    setExercises((prev) => prev.filter((_, i) => i !== idx));
-    setSaved(false);
-  };
-
   const handleSave = async () => {
-    const invalid = exercises.find((e) => !e.name.trim());
-    if (invalid !== undefined) {
-      setSaveErr("Todos los ejercicios necesitan un nombre");
+    if (!routineName.trim()) {
+      setSaveErr("El nombre es requerido");
       return;
     }
-
     setSaving(true);
     setSaveErr(null);
     try {
-      await updateRoutine(planId, routineId, {
-        name: routineName,
-        exercises,
-      });
+      // API currently only accepts name — exercises will be added in a future backend update
+      await updateRoutine(planId, routineId, { name: routineName });
       setSaved(true);
     } catch {
       setSaveErr("Error al guardar");
@@ -167,7 +165,7 @@ export function RoutineDetailView({ go, planId, routineId }: Props) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full text-zinc-400 text-sm">
+      <div className="flex items-center justify-center py-20 text-gray-400 text-sm">
         Cargando…
       </div>
     );
@@ -175,12 +173,12 @@ export function RoutineDetailView({ go, planId, routineId }: Props) {
 
   if (error || !plan || !routine) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-3">
-        <p className="text-zinc-500 text-sm">
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <p className="text-gray-400 text-sm">
           {error ?? "Rutina no encontrada"}
         </p>
         <button
-          className="text-sm text-zinc-900 underline"
+          className="text-sm text-indigo-400 underline"
           onClick={() => go("planDetail", { planId })}
         >
           Volver al plan
@@ -190,72 +188,70 @@ export function RoutineDetailView({ go, planId, routineId }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-zinc-50">
-      {/* Header */}
-      <div className="bg-white px-4 pt-6 pb-4 border-b border-zinc-100">
-        <button
-          className="flex items-center gap-1.5 text-zinc-500 text-sm mb-4"
-          onClick={() => go("planDetail", { planId })}
-        >
-          <ArrowLeft size={16} /> {plan.name}
-        </button>
+    <div className="p-4 space-y-4">
+      <button
+        className="flex items-center gap-1.5 text-gray-400 text-sm hover:text-white transition-colors"
+        onClick={() => go("planDetail", { planId })}
+      >
+        <ArrowLeft size={16} /> {plan.name}
+      </button>
 
-        <div className="flex items-center gap-2">
-          <input
-            className="flex-1 text-xl font-bold text-zinc-900 bg-transparent focus:outline-none border-b-2 border-transparent focus:border-zinc-300 pb-0.5"
-            value={routineName}
-            onChange={(e) => {
-              setRoutineName(e.target.value);
-              setSaved(false);
-            }}
-          />
-        </div>
-
-        <p className="text-xs text-zinc-400 mt-1">
-          {exercises.length} ejercicio{exercises.length !== 1 ? "s" : ""}
-        </p>
+      {/* Routine name */}
+      <div className="bg-gray-800 rounded-2xl border border-gray-700 p-4">
+        <label className="text-xs text-gray-400 mb-2 block">
+          Nombre de la rutina
+        </label>
+        <input
+          className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-2.5 text-base font-semibold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          value={routineName}
+          onChange={(e) => {
+            setRoutineName(e.target.value);
+            setSaved(false);
+          }}
+        />
       </div>
 
-      {/* Exercise list */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        {exercises.length === 0 && (
-          <div className="text-center py-10">
-            <p className="text-zinc-400 text-sm mb-3">Sin ejercicios aún</p>
-          </div>
-        )}
+      {/* Exercises — local only until API supports them */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-300">
+            Ejercicios{" "}
+            <span className="text-gray-500 font-normal">
+              ({exercises.length})
+            </span>
+          </h2>
+        </div>
 
         {exercises.map((ex, idx) => (
           <ExerciseRow
             key={idx}
+            index={idx}
             exercise={ex}
             onChange={(field, val) => updateExercise(idx, field, val)}
             onDelete={() => deleteExercise(idx)}
           />
         ))}
 
-        {/* Add exercise */}
         <button
-          className="w-full py-3 rounded-2xl border-2 border-dashed border-zinc-200 text-sm text-zinc-400 flex items-center justify-center gap-2 hover:border-zinc-300 hover:text-zinc-500"
+          className="w-full py-3 rounded-2xl border-2 border-dashed border-gray-700 text-sm text-gray-400 flex items-center justify-center gap-2 hover:border-gray-600 hover:text-gray-300 transition-colors"
           onClick={addExercise}
         >
           <Plus size={16} /> Agregar ejercicio
         </button>
       </div>
 
-      {/* Save bar */}
-      <div className="bg-white border-t border-zinc-100 px-4 py-3 space-y-2">
+      {/* Save */}
+      <div className="space-y-2 pt-2">
         {saveErr && (
-          <div className="flex items-center gap-2 text-xs text-red-500">
-            <X size={13} /> {saveErr}
-          </div>
+          <p className="text-xs text-red-400 text-center">{saveErr}</p>
         )}
         {saved && (
-          <p className="text-xs text-emerald-600 text-center">
+          <p className="text-xs text-emerald-400 text-center">
             Cambios guardados ✓
           </p>
         )}
         <button
-          className="w-full py-3 rounded-xl bg-zinc-900 text-white text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+          className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
           onClick={handleSave}
           disabled={saving}
         >

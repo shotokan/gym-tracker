@@ -3,6 +3,21 @@ import type { Plan, WorkoutSession, SessionExercise, GoFn } from "../types";
 import { Card, Btn, ProgressBar } from "../components/ui";
 import { uid, toDay } from "../utils/helpers";
 
+// Local exercise/routine types for session — richer than the API type
+// until the backend returns exercises within routines
+interface LocalExercise {
+  id: string;
+  name: string;
+  sets: number;
+  reps: number;
+}
+
+interface LocalRoutine {
+  id: string;
+  name: string;
+  exercises: LocalExercise[];
+}
+
 type Phase = "select" | "workout" | "rest" | "done";
 
 interface Props {
@@ -19,7 +34,7 @@ export default function Session({
   go,
 }: Props) {
   const [phase, setPhase] = useState<Phase>("select");
-  const [routine, setRoutine] = useState<Plan["routines"][number] | null>(null);
+  const [routine, setRoutine] = useState<LocalRoutine | null>(null);
   const [exIdx, setExIdx] = useState(0);
   const [setIdx, setSetIdx] = useState(0);
   const [wt, setWt] = useState("");
@@ -49,12 +64,10 @@ export default function Session({
     setWt(lw);
   }, [exIdx, routine?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Start timer
   useEffect(() => {
     if (phase === "rest") setLeft(restDur);
   }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Tick
   useEffect(() => {
     if (phase !== "rest") return;
     if (left > 0) {
@@ -66,6 +79,15 @@ export default function Session({
       if (tmr.current) clearTimeout(tmr.current);
     };
   }, [phase, left]);
+
+  // Cast plan routines to LocalRoutine — exercises default to [] until API supports them
+  const localRoutines: LocalRoutine[] = (activePlan?.routines ?? []).map(
+    (r) => ({
+      id: r.id,
+      name: r.name,
+      exercises: [], // will be populated when API returns exercises
+    }),
+  );
 
   const completeSet = () => {
     if (!ex || !routine) return;
@@ -117,7 +139,7 @@ export default function Session({
     setPhase("workout");
   };
 
-  // ── No active plan ────────────────────────────────────────
+  // ── No active plan ─────────────────────────────────────────────────────────
   if (!activePlan)
     return (
       <div
@@ -133,7 +155,7 @@ export default function Session({
       </div>
     );
 
-  // ── Select routine ────────────────────────────────────────
+  // ── Select routine ─────────────────────────────────────────────────────────
   if (phase === "select")
     return (
       <div className="p-4 space-y-4">
@@ -143,7 +165,7 @@ export default function Session({
         </div>
         <p className="text-gray-400 text-sm">Elige tu rutina:</p>
         <div className="space-y-3">
-          {activePlan.routines.map((r) => (
+          {localRoutines.map((r) => (
             <button
               key={r.id}
               onClick={() => {
@@ -157,12 +179,13 @@ export default function Session({
             >
               <p className="text-white font-semibold">{r.name}</p>
               <p className="text-gray-500 text-sm mt-1">
-                {r.exercises.length} ejercicios ·{" "}
-                {r.exercises.reduce((a, e) => a + e.sets, 0)} series totales
+                {r.exercises.length > 0
+                  ? `${r.exercises.length} ejercicios · ${r.exercises.reduce((a, e) => a + e.sets, 0)} series totales`
+                  : "Sin ejercicios configurados"}
               </p>
             </button>
           ))}
-          {activePlan.routines.length === 0 && (
+          {localRoutines.length === 0 && (
             <p className="text-gray-600 text-center py-10">
               El plan activo no tiene rutinas
             </p>
@@ -171,7 +194,7 @@ export default function Session({
       </div>
     );
 
-  // ── Done ─────────────────────────────────────────────────
+  // ── Done ───────────────────────────────────────────────────────────────────
   if (phase === "done")
     return (
       <div
@@ -199,7 +222,7 @@ export default function Session({
       </div>
     );
 
-  // ── Rest timer ────────────────────────────────────────────
+  // ── Rest timer ─────────────────────────────────────────────────────────────
   if (phase === "rest") {
     const mins = Math.floor(left / 60);
     const secs = left % 60;
@@ -282,8 +305,27 @@ export default function Session({
     );
   }
 
-  // ── Workout ───────────────────────────────────────────────
+  // ── Workout ────────────────────────────────────────────────────────────────
   const completed = data[exIdx]?.sets ?? [];
+
+  // No exercises configured yet
+  if (!ex)
+    return (
+      <div
+        className="flex flex-col items-center justify-center p-8 text-center"
+        style={{ minHeight: "70vh" }}
+      >
+        <p className="text-5xl mb-4">🏋️</p>
+        <p className="text-white font-semibold text-lg">Sin ejercicios</p>
+        <p className="text-gray-500 text-sm mt-1 mb-6">
+          Agrega ejercicios a la rutina <strong>{routine?.name}</strong> desde
+          la sección Planes.
+        </p>
+        <Btn variant="secondary" onClick={reset}>
+          Volver
+        </Btn>
+      </div>
+    );
 
   return (
     <div className="p-4 space-y-4">
@@ -298,15 +340,15 @@ export default function Session({
       </div>
 
       <Card>
-        <h2 className="text-white text-2xl font-bold">{ex?.name}</h2>
+        <h2 className="text-white text-2xl font-bold">{ex.name}</h2>
         <p className="text-gray-500 text-sm mt-1">
-          Objetivo: {ex?.sets} series × {ex?.reps} reps
+          Objetivo: {ex.sets} series × {ex.reps} reps
         </p>
       </Card>
 
       <div>
         <div className="flex gap-1.5 mb-2">
-          {Array.from({ length: ex?.sets ?? 0 }).map((_, i) => (
+          {Array.from({ length: ex.sets }).map((_, i) => (
             <div
               key={i}
               className={`flex-1 h-2 rounded-full transition-colors ${
@@ -320,7 +362,7 @@ export default function Session({
           ))}
         </div>
         <p className="text-center text-white font-semibold">
-          Serie {setIdx + 1} de {ex?.sets}
+          Serie {setIdx + 1} de {ex.sets}
         </p>
       </div>
 
