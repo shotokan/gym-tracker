@@ -1,12 +1,8 @@
 import { useState } from "react";
-import type {
-  Plan,
-  WorkoutSession,
-  BodyMetric,
-  AppView,
-  NavParams,
-} from "./types";
+import type { AppView, NavParams } from "./types";
+import type { Plan, WorkoutSession, BodyMetric } from "./types";
 import { PLANS0, SESSIONS0, METRICS0 } from "./data/mocks";
+import { useAuth } from "./hooks/useAuth";
 import Nav from "./components/Nav";
 import Login from "./views/Login";
 import Dashboard from "./views/Dashboard";
@@ -19,7 +15,14 @@ import Metrics from "./views/Metrics";
 import Profile from "./views/Profile";
 
 export default function App() {
-  const [auth, setAuth] = useState(false);
+  const {
+    isAuth,
+    login,
+    logout,
+    loading: authLoading,
+    error: authError,
+  } = useAuth();
+
   const [view, setView] = useState<AppView>("dashboard");
   const [params, setParams] = useState<NavParams>({});
   const [plans, setPlans] = useState<Plan[]>(PLANS0);
@@ -31,26 +34,17 @@ export default function App() {
     setParams(p);
   };
 
-  if (!auth)
-    return (
-      <Login
-        onLogin={() => {
-          setAuth(true);
-          go("dashboard");
-        }}
-      />
-    );
+  // If not authenticated, show login screen
+  if (!isAuth) {
+    return <Login onSubmit={login} loading={authLoading} error={authError} />;
+  }
 
   const activePlan = plans.find((p) => p.active) ?? null;
 
   return (
     <div className="flex min-h-screen bg-gray-900 text-white">
-      {/* Sidebar (desktop) / Bottom nav (móvil) */}
       <Nav view={view} go={go} />
-
-      {/* Contenido principal */}
       <main className="flex-1 overflow-y-auto">
-        {/* max-w limita el ancho en pantallas grandes; centrado con mx-auto */}
         <div className="max-w-2xl mx-auto w-full pb-20 lg:pb-8 lg:py-6 lg:px-4">
           {view === "dashboard" && (
             <Dashboard
@@ -91,14 +85,7 @@ export default function App() {
           {view === "metrics" && (
             <Metrics metrics={metrics} setMetrics={setMetrics} />
           )}
-          {view === "profile" && (
-            <Profile
-              onLogout={() => {
-                setAuth(false);
-                go("dashboard");
-              }}
-            />
-          )}
+          {view === "profile" && <Profile onLogout={logout} />}
         </div>
       </main>
     </div>
