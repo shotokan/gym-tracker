@@ -1,4 +1,5 @@
 import { client } from "../api/client";
+import { EP } from "../api/endpoints";
 
 interface LoginPayload {
   email: string;
@@ -12,5 +13,5 @@ interface LoginResponse {
 
 export const authService = {
   login: (payload: LoginPayload) =>
-    client.post<LoginResponse>("/auth/login", payload).then((r) => r.data),
+    client.post<LoginResponse>(EP.auth.login, payload).then((r) => r.data),
 };

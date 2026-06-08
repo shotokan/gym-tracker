@@ -1,4 +1,5 @@
 import { client } from "../api/client";
+import { EP } from "../api/endpoints";
 
 export interface UserProfile {
   id: string;
@@ -10,5 +11,5 @@ export interface UserProfile {
 
 export const userService = {
   getProfile: (id: string) =>
-    client.get<UserProfile>(`/users/${id}`).then((r) => r.data),
+    client.get<UserProfile>(EP.users.byId(id)).then((r) => r.data),
 };
