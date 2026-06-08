@@ -1,21 +1,31 @@
 import { useState } from "react";
-import { Input, Btn } from "../components/ui";
+import { Btn, Input } from "../components/ui";
 
-export default function Login({ onLogin }: { onLogin: () => void }) {
+interface LoginProps {
+  onSubmit: (email: string, password: string) => Promise<boolean>;
+  loading: boolean;
+  error: string | null;
+}
+
+export default function Login({ onSubmit, loading, error }: LoginProps) {
   const [email, setEmail] = useState("");
-  const [pw, setPw] = useState("");
-  const [err, setErr] = useState("");
-  const go = () => {
-    if (!email || !pw) {
-      setErr("Completa los campos");
-      return;
-    }
-    onLogin();
+  const [password, setPassword] = useState("");
+  const [touched, setTouched] = useState(false);
+
+  // Inline validation — only shown after first submit attempt
+  const emailMissing = touched && !email.trim();
+  const passwordMissing = touched && !password;
+
+  const handleSubmit = async () => {
+    setTouched(true);
+    if (!email.trim() || !password) return;
+    await onSubmit(email.trim(), password);
   };
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-6">
+        {/* Header */}
         <div className="text-center">
           <div className="text-5xl mb-3">🏋️</div>
           <h1 className="text-3xl font-bold text-white">GymTracker</h1>
@@ -23,30 +33,58 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
             Tu entrenamiento, tu progreso
           </p>
         </div>
+
+        {/* Form */}
         <div className="space-y-4">
-          <Input
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="tu@email.com"
-          />
-          <Input
-            label="Contraseña"
-            type="password"
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
-            placeholder="••••••••"
-            onKeyDown={(e) => e.key === "Enter" && go()}
-          />
-          {err && <p className="text-red-400 text-sm">{err}</p>}
-          <Btn onClick={go} className="w-full py-3 text-base">
-            Iniciar sesión
+          <div>
+            <Input
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="tu@email.com"
+              disabled={loading}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+            />
+            {emailMissing && (
+              <p className="text-red-400 text-xs mt-1">
+                El email es requerido.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Input
+              label="Contraseña"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              disabled={loading}
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+            />
+            {passwordMissing && (
+              <p className="text-red-400 text-xs mt-1">
+                La contraseña es requerida.
+              </p>
+            )}
+          </div>
+
+          {/* API error */}
+          {error && (
+            <div className="bg-red-900 bg-opacity-30 border border-red-700 rounded-xl px-4 py-3">
+              <p className="text-red-400 text-sm">{error}</p>
+            </div>
+          )}
+
+          <Btn
+            onClick={handleSubmit}
+            disabled={loading}
+            className="w-full py-3 text-base"
+          >
+            {loading ? "Iniciando sesión..." : "Iniciar sesión"}
           </Btn>
         </div>
-        <p className="text-gray-500 text-xs text-center">
-          Demo: cualquier email y contraseña
-        </p>
       </div>
     </div>
   );
