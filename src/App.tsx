@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { AppView, NavParams, WorkoutSession, BodyMetric } from "./types";
 import { SESSIONS0, METRICS0 } from "./data/mocks";
 import { useAuth } from "./hooks/useAuth";
+import { useActivePlan } from "./hooks/useActivePlan";
 import Nav from "./components/Nav";
 import Login from "./views/Login";
 import Dashboard from "./views/Dashboard";
@@ -26,6 +27,7 @@ export default function App() {
   const [params, setParams] = useState<NavParams>({});
   const [sessions, setSessions] = useState<WorkoutSession[]>(SESSIONS0);
   const [metrics, setMetrics] = useState<BodyMetric[]>(METRICS0);
+  const { activePlan } = useActivePlan();
 
   const go = (v: AppView, p: NavParams = {}): void => {
     setView(v);
@@ -43,7 +45,7 @@ export default function App() {
         <div className="max-w-2xl mx-auto w-full pb-20 lg:pb-8 lg:py-6 lg:px-4">
           {view === "dashboard" && (
             <Dashboard
-              activePlan={null}
+              activePlan={activePlan}
               sessions={sessions}
               metrics={metrics}
               go={go}
@@ -66,7 +68,7 @@ export default function App() {
 
           {view === "session" && (
             <Session
-              activePlan={null}
+              activePlan={activePlan}
               sessions={sessions}
               setSessions={setSessions}
               go={go}

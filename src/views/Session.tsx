@@ -3,13 +3,12 @@ import type { Plan, WorkoutSession, SessionExercise, GoFn } from "../types";
 import { Card, Btn, ProgressBar } from "../components/ui";
 import { uid, toDay } from "../utils/helpers";
 
-// Local exercise/routine types for session — richer than the API type
-// until the backend returns exercises within routines
 interface LocalExercise {
   id: string;
   name: string;
   sets: number;
   reps: number;
+  weight: number;
 }
 
 interface LocalRoutine {
@@ -43,16 +42,18 @@ export default function Session({
   const [restDur, setRestDur] = useState(90);
   const [left, setLeft] = useState(0);
   const tmr = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const justEnteredRest = useRef(false);
 
   const ex = routine?.exercises[exIdx];
   const totalSets = routine?.exercises.reduce((a, e) => a + e.sets, 0) ?? 1;
   const doneSets = data.reduce((a, e) => a + (e?.sets.length ?? 0), 0);
 
-  // Pre-fill when exercise changes
+  // Pre-fill weight and reps from exercise data and previous sessions
   useEffect(() => {
     if (!ex) return;
     setRp(String(ex.reps));
-    let lw = "";
+    // Use exercise weight as default, override with last session max if higher
+    let lw = ex.weight > 0 ? String(ex.weight) : "";
     for (const s of sessions) {
       const rec = s.exercises.find((e) => e.exerciseId === ex.id);
       if (rec?.sets.length) {
@@ -65,11 +66,21 @@ export default function Session({
   }, [exIdx, routine?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (phase === "rest") setLeft(restDur);
-  }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (phase === "rest") {
+      setLeft(restDur);
+      justEnteredRest.current = true;
+    }
+  }, [phase, restDur]);
 
   useEffect(() => {
     if (phase !== "rest") return;
+
+    // Si acabamos de entrar a rest, esperar el siguiente ciclo
+    if (justEnteredRest.current) {
+      justEnteredRest.current = false;
+      return;
+    }
+
     if (left > 0) {
       tmr.current = setTimeout(() => setLeft((l) => l - 1), 1000);
     } else {
@@ -80,12 +91,18 @@ export default function Session({
     };
   }, [phase, left]);
 
-  // Cast plan routines to LocalRoutine — exercises default to [] until API supports them
+  // Map API routines → LocalRoutine using real exercises from API
   const localRoutines: LocalRoutine[] = (activePlan?.routines ?? []).map(
     (r) => ({
       id: r.id,
       name: r.name,
-      exercises: [], // will be populated when API returns exercises
+      exercises: (r.exercises ?? []).map((e) => ({
+        id: e.id,
+        name: e.name,
+        sets: e.sets,
+        reps: e.reps,
+        weight: e.weight,
+      })),
     }),
   );
 
@@ -181,7 +198,7 @@ export default function Session({
               <p className="text-gray-500 text-sm mt-1">
                 {r.exercises.length > 0
                   ? `${r.exercises.length} ejercicios · ${r.exercises.reduce((a, e) => a + e.sets, 0)} series totales`
-                  : "Sin ejercicios configurados"}
+                  : "Sin ejercicios — agrégalos desde Planes"}
               </p>
             </button>
           ))}
@@ -308,7 +325,6 @@ export default function Session({
   // ── Workout ────────────────────────────────────────────────────────────────
   const completed = data[exIdx]?.sets ?? [];
 
-  // No exercises configured yet
   if (!ex)
     return (
       <div
@@ -318,8 +334,7 @@ export default function Session({
         <p className="text-5xl mb-4">🏋️</p>
         <p className="text-white font-semibold text-lg">Sin ejercicios</p>
         <p className="text-gray-500 text-sm mt-1 mb-6">
-          Agrega ejercicios a la rutina <strong>{routine?.name}</strong> desde
-          la sección Planes.
+          Agrega ejercicios a <strong>{routine?.name}</strong> desde Planes.
         </p>
         <Btn variant="secondary" onClick={reset}>
           Volver

@@ -1,8 +1,18 @@
 // ── Plan domain ──────────────────────────────────────────────────────────────
 
+export interface Exercise {
+  id: string;
+  name: string;
+  sets: number;
+  reps: number;
+  weight: number; // 0 = not specified
+  notes: string;
+}
+
 export interface Routine {
   id: string;
   name: string;
+  exercises: Exercise[];
 }
 
 export interface Plan {
@@ -13,7 +23,7 @@ export interface Plan {
   routines: Routine[];
 }
 
-// ── Plan payloads ─────────────────────────────────────────────────────────────
+// ── Payloads ──────────────────────────────────────────────────────────────────
 
 export interface CreatePlanPayload {
   name: string;
@@ -26,6 +36,22 @@ export interface CreateRoutinePayload {
 }
 export interface UpdateRoutinePayload {
   name: string;
+}
+
+export interface CreateExercisePayload {
+  name: string;
+  sets: number;
+  reps: number;
+  weight?: number;
+  notes?: string;
+}
+
+export interface UpdateExercisePayload {
+  name: string;
+  sets: number;
+  reps: number;
+  weight: number;
+  notes: string;
 }
 
 // ── Session domain ────────────────────────────────────────────────────────────
