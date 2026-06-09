@@ -1,25 +1,4 @@
-import type { Plan, WorkoutSession, BodyMetric } from "../types";
-
-export const PLANS0: Plan[] = [
-  {
-    id: "p1",
-    name: "Mes 1 — Volumen",
-    active: true,
-    created_at: "2026-06-01",
-    routines: [
-      { id: "r1", name: "Lunes — Pecho & Tríceps" },
-      { id: "r2", name: "Miércoles — Espalda & Bíceps" },
-      { id: "r3", name: "Viernes — Piernas & Hombros" },
-    ],
-  },
-  {
-    id: "p2",
-    name: "Mes 2 — Fuerza",
-    active: false,
-    created_at: "2026-06-01",
-    routines: [],
-  },
-];
+import type { WorkoutSession, BodyMetric } from "../types";
 
 export const SESSIONS0: WorkoutSession[] = [
   {
@@ -93,25 +72,6 @@ export const SESSIONS0: WorkoutSession[] = [
           { w: 60, r: 10 },
           { w: 60, r: 9 },
           { w: 55, r: 10 },
-        ],
-      },
-    ],
-  },
-  {
-    id: "s4",
-    date: "2026-05-19",
-    planId: "p1",
-    routineId: "r1",
-    routineName: "Lunes — Pecho & Tríceps",
-    exercises: [
-      {
-        exerciseId: "e1",
-        name: "Press Banca",
-        sets: [
-          { w: 50, r: 10 },
-          { w: 55, r: 10 },
-          { w: 55, r: 10 },
-          { w: 55, r: 9 },
         ],
       },
     ],

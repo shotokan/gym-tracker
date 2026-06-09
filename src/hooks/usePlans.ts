@@ -2,9 +2,12 @@ import { useState, useEffect, useCallback } from "react";
 import { plansService } from "../services/plans.service";
 import type {
   Plan,
+  Exercise,
   CreatePlanPayload,
   CreateRoutinePayload,
   UpdateRoutinePayload,
+  CreateExercisePayload,
+  UpdateExercisePayload,
 } from "../types";
 
 export function usePlans() {
@@ -16,8 +19,7 @@ export function usePlans() {
     setLoading(true);
     setError(null);
     try {
-      const data = await plansService.getAll(name);
-      setPlans(data);
+      setPlans(await plansService.getAll(name));
     } catch {
       setError("Error al cargar planes");
     } finally {
@@ -28,6 +30,8 @@ export function usePlans() {
   useEffect(() => {
     fetchPlans();
   }, [fetchPlans]);
+
+  // ── Plans ──────────────────────────────────────────────────────────────────
 
   const createPlan = async (payload: CreatePlanPayload): Promise<Plan> => {
     const plan = await plansService.create(payload);
@@ -44,6 +48,8 @@ export function usePlans() {
     await plansService.remove(id);
     setPlans((prev) => prev.filter((p) => p.id !== id));
   };
+
+  // ── Routines ───────────────────────────────────────────────────────────────
 
   const createRoutine = async (
     planId: string,
@@ -76,7 +82,7 @@ export function usePlans() {
           ? {
               ...p,
               routines: p.routines.map((r) =>
-                r.id === routineId ? updated : r,
+                r.id === routineId ? { ...r, ...updated } : r,
               ),
             }
           : p,
@@ -99,6 +105,113 @@ export function usePlans() {
     );
   };
 
+  // ── Exercises ──────────────────────────────────────────────────────────────
+
+  const updateExercisesInState = (
+    planId: string,
+    routineId: string,
+    exercises: Exercise[],
+  ) => {
+    setPlans((prev) =>
+      prev.map((p) =>
+        p.id === planId
+          ? {
+              ...p,
+              routines: p.routines.map((r) =>
+                r.id === routineId ? { ...r, exercises } : r,
+              ),
+            }
+          : p,
+      ),
+    );
+  };
+
+  const createExercise = async (
+    planId: string,
+    routineId: string,
+    payload: CreateExercisePayload,
+  ): Promise<Exercise> => {
+    const exercise = await plansService.createExercise(
+      planId,
+      routineId,
+      payload,
+    );
+    setPlans((prev) =>
+      prev.map((p) =>
+        p.id === planId
+          ? {
+              ...p,
+              routines: p.routines.map((r) =>
+                r.id === routineId
+                  ? { ...r, exercises: [...(r.exercises ?? []), exercise] }
+                  : r,
+              ),
+            }
+          : p,
+      ),
+    );
+    return exercise;
+  };
+
+  const updateExercise = async (
+    planId: string,
+    routineId: string,
+    exerciseId: string,
+    payload: UpdateExercisePayload,
+  ): Promise<Exercise> => {
+    const updated = await plansService.updateExercise(
+      planId,
+      routineId,
+      exerciseId,
+      payload,
+    );
+    setPlans((prev) =>
+      prev.map((p) =>
+        p.id === planId
+          ? {
+              ...p,
+              routines: p.routines.map((r) =>
+                r.id === routineId
+                  ? {
+                      ...r,
+                      exercises: r.exercises.map((e) =>
+                        e.id === exerciseId ? updated : e,
+                      ),
+                    }
+                  : r,
+              ),
+            }
+          : p,
+      ),
+    );
+    return updated;
+  };
+
+  const removeExercise = async (
+    planId: string,
+    routineId: string,
+    exerciseId: string,
+  ): Promise<void> => {
+    await plansService.removeExercise(planId, routineId, exerciseId);
+    setPlans((prev) =>
+      prev.map((p) =>
+        p.id === planId
+          ? {
+              ...p,
+              routines: p.routines.map((r) =>
+                r.id === routineId
+                  ? {
+                      ...r,
+                      exercises: r.exercises.filter((e) => e.id !== exerciseId),
+                    }
+                  : r,
+              ),
+            }
+          : p,
+      ),
+    );
+  };
+
   return {
     plans,
     loading,
@@ -110,6 +223,10 @@ export function usePlans() {
     createRoutine,
     updateRoutine,
     removeRoutine,
+    createExercise,
+    updateExercise,
+    removeExercise,
+    updateExercisesInState,
   };
 }
 
@@ -128,5 +245,5 @@ export function usePlan(planId: string | undefined) {
       .finally(() => setLoading(false));
   }, [planId]);
 
-  return { plan, loading, error };
+  return { plan, setPlan, loading, error };
 }

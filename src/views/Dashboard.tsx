@@ -18,6 +18,32 @@ export default function Dashboard({
   const last = sessions[0];
   const lastM = metrics[metrics.length - 1];
 
+  // Determinar la rutina del día basada en la última sesión
+  const getNextRoutine = () => {
+    if (!activePlan?.routines || activePlan.routines.length === 0) return null;
+
+    if (!last || !last.routineId) {
+      // Si no hay sesiones previas, retornar la primera rutina
+      return activePlan.routines[0];
+    }
+
+    // Buscar el índice de la última rutina realizada
+    const lastRoutineIndex = activePlan.routines.findIndex(
+      (r) => r.id === last.routineId
+    );
+
+    if (lastRoutineIndex === -1) {
+      // Si la rutina anterior no está en el plan actual, empezar desde el principio
+      return activePlan.routines[0];
+    }
+
+    // Retornar la siguiente rutina en el ciclo
+    const nextIndex = (lastRoutineIndex + 1) % activePlan.routines.length;
+    return activePlan.routines[nextIndex];
+  };
+
+  const nextRoutine = getNextRoutine();
+
   return (
     <div className="p-4 space-y-4">
       <div className="pt-2">
@@ -36,13 +62,27 @@ export default function Dashboard({
           {activePlan?.name ?? "Sin plan activo"}
         </h2>
         {activePlan && (
-          <p className="text-violet-300 text-sm">
-            {activePlan.routines.length} rutinas
-          </p>
+          <>
+            <p className="text-violet-300 text-sm">
+              {activePlan.routines.length} rutinas
+            </p>
+            {nextRoutine && (
+              <div className="mt-3 bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20">
+                <p className="text-violet-200 text-xs font-semibold uppercase tracking-wider">
+                  Rutina del día
+                </p>
+                <p className="text-white font-bold mt-1">{nextRoutine.name}</p>
+                <p className="text-violet-300 text-sm mt-1">
+                  {nextRoutine.exercises.length} ejercicios
+                </p>
+              </div>
+            )}
+          </>
         )}
         <button
           onClick={() => go("session")}
-          className="mt-3 bg-white text-violet-700 font-bold px-5 py-2 rounded-xl text-sm"
+          className="mt-3 bg-white text-violet-700 font-bold px-5 py-2 rounded-xl text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={!activePlan}
         >
           ▶ Iniciar sesión
         </button>
