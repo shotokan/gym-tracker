@@ -54,24 +54,55 @@ export interface UpdateExercisePayload {
   notes: string;
 }
 
-// ── Session domain ────────────────────────────────────────────────────────────
+// ── Session domain (API types) ───────────────────────────────────────────────
 
 export interface CompletedSet {
-  w: number;
-  r: number;
+  weight: number;
+  reps: number;
+  rest_seconds: number;
 }
-export interface SessionExercise {
-  exerciseId: string;
+
+export interface SessionExerciseInput {
+  exercise_id: string;
   name: string;
   sets: CompletedSet[];
 }
+
+export interface SessionExercise {
+  exercise_id: string;
+  name: string;
+  sets: number;
+  reps: number;
+  weight: number;
+  notes: string;
+}
+
 export interface WorkoutSession {
   id: string;
+  user_id: string;
+  plan_id: string;
+  routine_id: string;
+  routine_name: string;
   date: string;
-  planId: string | undefined;
-  routineId: string;
-  routineName: string;
+  duration_secs: number;
   exercises: SessionExercise[];
+  total_sets: number;
+  total_volume: number;
+  total_rest_seconds: number;
+  created_at: string;
+  started_at: string;
+  finished_at: string;
+}
+
+export interface CreateSessionPayload {
+  plan_id?: string;
+  routine_id: string;
+  routine_name: string;
+  date?: string;
+  duration_secs: number;
+  exercises: SessionExerciseInput[];
+  started_at: string;
+  finished_at: string;
 }
 
 // ── Metrics domain ────────────────────────────────────────────────────────────
@@ -91,6 +122,7 @@ export type AppView =
   | "planDetail"
   | "routineDetail"
   | "session"
+  | "sessionDetail"
   | "stats"
   | "metrics"
   | "profile";
@@ -98,5 +130,7 @@ export type AppView =
 export interface NavParams {
   planId?: string;
   routineId?: string;
+  sessionId?: string;
+  session?: WorkoutSession;
 }
 export type GoFn = (view: AppView, params?: NavParams) => void;

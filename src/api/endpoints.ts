@@ -19,4 +19,8 @@ export const EP = {
     exercise: (planId: string, routineId: string, exerciseId: string) =>
       `/plans/${planId}/routines/${routineId}/exercises/${exerciseId}`,
   },
+  sessions: {
+    base: "/sessions",
+    byId: (id: string) => `/sessions/${id}`,
+  },
 } as const;

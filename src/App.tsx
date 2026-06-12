@@ -1,8 +1,9 @@
-import { useState } from "react";
-import type { AppView, NavParams, WorkoutSession, BodyMetric } from "./types";
-import { SESSIONS0, METRICS0 } from "./data/mocks";
+import { useState, useEffect } from "react";
+import type { AppView, NavParams, BodyMetric } from "./types";
+import { METRICS0 } from "./data/mocks";
 import { useAuth } from "./hooks/useAuth";
 import { useActivePlan } from "./hooks/useActivePlan";
+import { useSessions } from "./hooks/useSessions";
 import Nav from "./components/Nav";
 import Login from "./views/Login";
 import Dashboard from "./views/Dashboard";
@@ -10,6 +11,7 @@ import { PlansView } from "./views/Plans";
 import { PlanDetailView } from "./views/PlanDetail";
 import { RoutineDetailView } from "./views/RoutineDetail";
 import Session from "./views/Session";
+import SessionDetail from "./views/SessionDetail";
 import Stats from "./views/Stats";
 import Metrics from "./views/Metrics";
 import Profile from "./views/Profile";
@@ -25,9 +27,16 @@ export default function App() {
 
   const [view, setView] = useState<AppView>("dashboard");
   const [params, setParams] = useState<NavParams>({});
-  const [sessions, setSessions] = useState<WorkoutSession[]>(SESSIONS0);
   const [metrics, setMetrics] = useState<BodyMetric[]>(METRICS0);
   const { activePlan } = useActivePlan();
+  const { sessions, saveSession } = useSessions();
+
+  // Resetear vista al dashboard cuando el usuario inicia sesión
+  useEffect(() => {
+    if (isAuth) {
+      setView("dashboard");
+    }
+  }, [isAuth]);
 
   const go = (v: AppView, p: NavParams = {}): void => {
     setView(v);
@@ -67,11 +76,14 @@ export default function App() {
           )}
 
           {view === "session" && (
-            <Session
-              activePlan={activePlan}
-              sessions={sessions}
-              setSessions={setSessions}
+            <Session activePlan={activePlan} saveSession={saveSession} go={go} />
+          )}
+
+          {view === "sessionDetail" && (
+            <SessionDetail
               go={go}
+              sessionId={params.sessionId ?? ""}
+              session={params.session}
             />
           )}
 

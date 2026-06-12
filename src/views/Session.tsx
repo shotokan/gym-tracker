@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import type { Plan, WorkoutSession, SessionExercise, GoFn } from "../types";
+import type { Plan, GoFn, CreateSessionPayload } from "../types";
 import { Card, Btn, ProgressBar } from "../components/ui";
-import { uid, toDay } from "../utils/helpers";
 
 interface LocalExercise {
   id: string;
@@ -17,63 +16,81 @@ interface LocalRoutine {
   exercises: LocalExercise[];
 }
 
+interface CompletedSetData {
+  weight: number;
+  reps: number;
+  rest_seconds: number;
+}
+
+interface ExerciseData {
+  name: string;
+  exercise_id: string;
+  completedSets: CompletedSetData[];
+}
+
 type Phase = "select" | "workout" | "rest" | "done";
 
 interface Props {
   activePlan: Plan | null;
-  sessions: WorkoutSession[];
-  setSessions: React.Dispatch<React.SetStateAction<WorkoutSession[]>>;
+  saveSession: (payload: CreateSessionPayload) => Promise<unknown>;
   go: GoFn;
 }
 
-export default function Session({
-  activePlan,
-  sessions,
-  setSessions,
-  go,
-}: Props) {
+export default function Session({ activePlan, saveSession, go }: Props) {
   const [phase, setPhase] = useState<Phase>("select");
   const [routine, setRoutine] = useState<LocalRoutine | null>(null);
   const [exIdx, setExIdx] = useState(0);
   const [setIdx, setSetIdx] = useState(0);
   const [wt, setWt] = useState("");
   const [rp, setRp] = useState("");
-  const [data, setData] = useState<(SessionExercise | undefined)[]>([]);
-  const [restDur, setRestDur] = useState(90);
+  const [exerciseData, setExerciseData] = useState<ExerciseData[]>([]);
+  const [restDur, setRestDur] = useState(60);
   const [left, setLeft] = useState(0);
+  const [completedSetsCount, setCompletedSetsCount] = useState(0);
   const tmr = useRef<ReturnType<typeof setTimeout> | null>(null);
   const justEnteredRest = useRef(false);
+  const startedAt = useRef<number>(0);
+  const startedAtISO = useRef<string>("");
+  const restStartedAt = useRef<number>(0);
+  const restExIdx = useRef<number>(0);
+  const restSetIdx = useRef<number>(0);
+  const sessionSaved = useRef(false);
+  const lastRestSeconds = useRef<number>(0); // Guarda el descanso anterior para asignarlo a la siguiente serie
 
   const ex = routine?.exercises[exIdx];
   const totalSets = routine?.exercises.reduce((a, e) => a + e.sets, 0) ?? 1;
-  const doneSets = data.reduce((a, e) => a + (e?.sets.length ?? 0), 0);
 
-  // Pre-fill weight and reps from exercise data and previous sessions
+  // Pre-fill weight and reps from exercise data
   useEffect(() => {
     if (!ex) return;
     setRp(String(ex.reps));
-    // Use exercise weight as default, override with last session max if higher
-    let lw = ex.weight > 0 ? String(ex.weight) : "";
-    for (const s of sessions) {
-      const rec = s.exercises.find((e) => e.exerciseId === ex.id);
-      if (rec?.sets.length) {
-        const maxW = Math.max(...rec.sets.map((s) => s.w));
-        if (maxW > 0) lw = String(maxW);
-        break;
-      }
-    }
+    const lw = ex.weight > 0 ? String(ex.weight) : "";
     setWt(lw);
-  }, [exIdx, routine?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [exIdx, routine?.id]);
 
   useEffect(() => {
-    if (phase === "rest") {
+    if (phase === "rest" && restStartedAt.current === 0) {
       setLeft(restDur);
       justEnteredRest.current = true;
+      restStartedAt.current = Date.now();
     }
   }, [phase, restDur]);
 
+  // Manejar cambio de restDur mientras ya estamos en descanso
   useEffect(() => {
-    if (phase !== "rest") return;
+    if (phase === "rest" && restStartedAt.current > 0) {
+      const elapsed = Math.floor((Date.now() - restStartedAt.current) / 1000);
+      const newLeft = Math.max(0, restDur - elapsed);
+      setLeft(newLeft);
+    }
+  }, [restDur, phase]);
+
+  useEffect(() => {
+    if (phase !== "rest") {
+      // Cuando salimos de rest, resetear el flag
+      justEnteredRest.current = false;
+      return;
+    }
 
     // Si acabamos de entrar a rest, esperar el siguiente ciclo
     if (justEnteredRest.current) {
@@ -84,6 +101,7 @@ export default function Session({
     if (left > 0) {
       tmr.current = setTimeout(() => setLeft((l) => l - 1), 1000);
     } else {
+      saveRestTime();
       setPhase("workout");
     }
     return () => {
@@ -108,13 +126,20 @@ export default function Session({
 
   const completeSet = () => {
     if (!ex || !routine) return;
-    const ns = { w: parseFloat(wt) || 0, r: parseInt(rp) || 0 };
-    const upd = [...data];
-    if (!upd[exIdx])
-      upd[exIdx] = { exerciseId: ex.id, name: ex.name, sets: [] };
-    else upd[exIdx] = { ...upd[exIdx]!, sets: [...upd[exIdx]!.sets] };
-    upd[exIdx]!.sets.push(ns);
-    setData(upd);
+
+    const currentWeight = parseFloat(wt) || 0;
+    const currentReps = parseInt(rp) || 0;
+
+    console.log("completeSet called", {
+      exIdx,
+      setIdx,
+      exerciseName: ex.name,
+      weight: currentWeight,
+      reps: currentReps,
+      lastRestSeconds: lastRestSeconds.current,
+    });
+
+    setCompletedSetsCount((prev) => prev + 1);
 
     const nsi = setIdx + 1;
     const lastSet = nsi >= ex.sets;
@@ -122,26 +147,150 @@ export default function Session({
     const lastEx = nei >= routine.exercises.length;
 
     if (!lastSet) {
+      // No es la última serie del ejercicio - guardar serie con el descanso ANTERIOR y pasar al descanso
+      setExerciseData((prev) => {
+        const updated = [...prev];
+        if (!updated[exIdx]) {
+          updated[exIdx] = {
+            name: ex.name,
+            exercise_id: ex.id,
+            completedSets: [],
+          };
+        }
+
+        console.log("Before push - completedSets length:", updated[exIdx].completedSets.length);
+
+        updated[exIdx] = {
+          ...updated[exIdx],
+          completedSets: [
+            ...updated[exIdx].completedSets,
+            {
+              weight: currentWeight,
+              reps: currentReps,
+              rest_seconds: lastRestSeconds.current, // Descanso que tomaste ANTES de esta serie
+            },
+          ],
+        };
+
+        console.log("After push - completedSets length:", updated[exIdx].completedSets.length);
+
+        return updated;
+      });
+
+      restExIdx.current = exIdx;
+      restSetIdx.current = setIdx;
       setSetIdx(nsi);
       setPhase("rest");
     } else if (!lastEx) {
+      // Última serie del ejercicio pero no es el último ejercicio
+      setExerciseData((prev) => {
+        const updated = [...prev];
+        if (!updated[exIdx]) {
+          updated[exIdx] = {
+            name: ex.name,
+            exercise_id: ex.id,
+            completedSets: [],
+          };
+        }
+
+        updated[exIdx] = {
+          ...updated[exIdx],
+          completedSets: [
+            ...updated[exIdx].completedSets,
+            {
+              weight: currentWeight,
+              reps: currentReps,
+              rest_seconds: lastRestSeconds.current, // Descanso que tomaste ANTES de esta serie
+            },
+          ],
+        };
+
+        return updated;
+      });
+
+      restExIdx.current = exIdx;
+      restSetIdx.current = setIdx;
       setExIdx(nei);
       setSetIdx(0);
       setPhase("rest");
     } else {
-      setSessions((p) => [
-        {
-          id: uid(),
-          date: toDay(),
-          planId: activePlan?.id,
-          routineId: routine.id,
-          routineName: routine.name,
-          exercises: upd.filter((e): e is SessionExercise => e !== undefined),
-        },
-        ...p,
-      ]);
+      // Última serie del último ejercicio - sesión completada
+      setExerciseData((prev) => {
+        const updated = [...prev];
+        if (!updated[exIdx]) {
+          updated[exIdx] = {
+            name: ex.name,
+            exercise_id: ex.id,
+            completedSets: [],
+          };
+        }
+
+        // Agregar la última serie completada con el descanso ANTERIOR
+        updated[exIdx] = {
+          ...updated[exIdx],
+          completedSets: [
+            ...updated[exIdx].completedSets,
+            {
+              weight: currentWeight,
+              reps: currentReps,
+              rest_seconds: lastRestSeconds.current, // Descanso que tomaste ANTES de esta serie
+            },
+          ],
+        };
+
+        // Construir payload con todos los datos actualizados
+        const finishedAtISO = new Date().toISOString();
+        const durationSecs = Math.floor((Date.now() - startedAt.current) / 1000);
+
+        console.log("Session completed - exerciseData:", updated);
+
+        const payload: CreateSessionPayload = {
+          plan_id: activePlan?.id,
+          routine_id: routine.id,
+          routine_name: routine.name,
+          date: new Date().toISOString().split("T")[0],
+          duration_secs: durationSecs,
+          started_at: startedAtISO.current,
+          finished_at: finishedAtISO,
+          exercises: updated
+            .filter((ex) => ex && ex.completedSets.length > 0)
+            .map((ex) => ({
+              exercise_id: ex.exercise_id,
+              name: ex.name,
+              sets: ex.completedSets,
+            })),
+        };
+
+        console.log("Final payload:", JSON.stringify(payload, null, 2));
+
+        // Guardar sesión (fire-and-forget con error handling)
+        // Prevenir guardado duplicado debido a React Strict Mode
+        if (!sessionSaved.current) {
+          sessionSaved.current = true;
+          saveSession(payload).catch((err) =>
+            console.error("Failed to save session:", err),
+          );
+        }
+
+        return updated;
+      });
+
       setPhase("done");
     }
+  };
+
+  const saveRestTime = () => {
+    if (restStartedAt.current === 0) return;
+    const actualRestSeconds = Math.floor((Date.now() - restStartedAt.current) / 1000);
+
+    console.log("saveRestTime called", {
+      actualRestSeconds,
+    });
+
+    // Guardar el tiempo de descanso para asignarlo a la SIGUIENTE serie
+    lastRestSeconds.current = actualRestSeconds;
+
+    restStartedAt.current = 0;
   };
 
   const reset = () => {
@@ -149,10 +298,17 @@ export default function Session({
     setRoutine(null);
     setExIdx(0);
     setSetIdx(0);
-    setData([]);
+    setExerciseData([]);
+    setCompletedSetsCount(0);
+    startedAt.current = 0;
+    startedAtISO.current = "";
+    sessionSaved.current = false;
+    lastRestSeconds.current = 0;
   };
+
   const skipRest = () => {
     if (tmr.current) clearTimeout(tmr.current);
+    saveRestTime();
     setPhase("workout");
   };
 
@@ -190,7 +346,12 @@ export default function Session({
                 setPhase("workout");
                 setExIdx(0);
                 setSetIdx(0);
-                setData([]);
+                setExerciseData([]);
+                setCompletedSetsCount(0);
+                const now = Date.now();
+                startedAt.current = now;
+                startedAtISO.current = new Date(now).toISOString();
+                lastRestSeconds.current = 0; // Primera serie no tiene descanso previo
               }}
               className="w-full bg-gray-800 hover:bg-gray-700 transition-colors rounded-2xl p-4 text-left"
             >
@@ -221,8 +382,8 @@ export default function Session({
         <div className="text-6xl mb-4">🎉</div>
         <h2 className="text-2xl font-bold">¡Sesión completada!</h2>
         <p className="text-gray-500 mt-2">
-          {data.filter(Boolean).length} ejercicios ·{" "}
-          {data.reduce((a, e) => a + (e?.sets.length ?? 0), 0)} series
+          {exerciseData.filter(Boolean).length} ejercicios · {completedSetsCount}{" "}
+          series
         </p>
         <div className="mt-8 space-y-3 w-full max-w-xs">
           <Btn onClick={reset} className="w-full py-3 text-base">
@@ -250,16 +411,19 @@ export default function Session({
         ? `Serie ${setIdx + 2} — ${ex?.name}`
         : (routine?.exercises[exIdx + 1]?.name ?? "Finalizar");
 
+    // Deshabilitar skip hasta que pase al menos 1 segundo
+    const canSkip = left < restDur;
+
     return (
       <div className="p-4 flex flex-col items-center">
         <div className="w-full pt-2 mb-6">
           <div className="flex justify-between text-xs text-gray-500 mb-1">
             <span>{routine?.name}</span>
             <span>
-              {doneSets}/{totalSets} series
+              {completedSetsCount}/{totalSets} series
             </span>
           </div>
-          <ProgressBar value={(doneSets / totalSets) * 100} />
+          <ProgressBar value={(completedSetsCount / totalSets) * 100} />
         </div>
 
         <p className="text-gray-400 text-sm mb-1">
@@ -315,7 +479,12 @@ export default function Session({
             </button>
           ))}
         </div>
-        <Btn variant="secondary" onClick={skipRest} className="px-8 py-2.5">
+        <Btn
+          variant="secondary"
+          onClick={skipRest}
+          className="px-8 py-2.5"
+          disabled={!canSkip}
+        >
           Saltar descanso →
         </Btn>
       </div>
@@ -323,8 +492,6 @@ export default function Session({
   }
 
   // ── Workout ────────────────────────────────────────────────────────────────
-  const completed = data[exIdx]?.sets ?? [];
-
   if (!ex)
     return (
       <div
@@ -367,7 +534,7 @@ export default function Session({
             <div
               key={i}
               className={`flex-1 h-2 rounded-full transition-colors ${
-                completed.length > i
+                i < setIdx
                   ? "bg-emerald-500"
                   : i === setIdx
                     ? "bg-violet-500"
@@ -400,26 +567,6 @@ export default function Session({
           </div>
         ))}
       </div>
-
-      {completed.length > 0 && (
-        <Card>
-          <p className="text-gray-500 text-xs mb-2">Series completadas</p>
-          <div className="flex flex-wrap gap-2">
-            {completed.map((s, i) => (
-              <span
-                key={i}
-                className="text-xs px-3 py-1 rounded-lg font-semibold"
-                style={{
-                  background: "rgba(16,185,129,0.15)",
-                  color: "#34d399",
-                }}
-              >
-                {s.w}kg × {s.r}
-              </span>
-            ))}
-          </div>
-        </Card>
-      )}
 
       <button
         onClick={completeSet}
