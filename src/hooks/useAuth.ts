@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { authService } from "../services/auth.service";
 
 interface UseAuthReturn {
@@ -15,6 +15,19 @@ export function useAuth(): UseAuthReturn {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Escuchar cambios en sessionStorage (cuando el interceptor elimina el token)
+  useEffect(() => {
+    const checkToken = () => {
+      const currentToken = sessionStorage.getItem("token");
+      setToken(currentToken);
+    };
+
+    // Verificar cada segundo si el token sigue existiendo
+    const interval = setInterval(checkToken, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setLoading(true);

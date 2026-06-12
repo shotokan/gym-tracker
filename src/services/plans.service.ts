@@ -20,7 +20,17 @@ export const plansService = {
       .then((r) => r.data),
   getById: (id: string) =>
     client.get<Plan>(EP.plans.byId(id)).then((r) => r.data),
-  getActive: () => client.get<Plan>(EP.plans.active).then((r) => r.data),
+  getActive: () =>
+    client
+      .get<Plan>(EP.plans.active)
+      .then((r) => r.data)
+      .catch((err) => {
+        // Si es 404, significa que no hay plan activo - retornar null
+        if (err.response?.status === 404) {
+          return null;
+        }
+        throw err;
+      }),
   create: (payload: CreatePlanPayload) =>
     client.post<Plan>(EP.plans.base, payload).then((r) => r.data),
   update: (id: string, payload: UpdatePlanPayload) =>

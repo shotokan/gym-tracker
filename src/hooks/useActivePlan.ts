@@ -13,6 +13,10 @@ export function useActivePlan() {
     try {
       const plan = await plansService.getActive();
       setActivePlan(plan);
+      // Si plan es null, no es un error, simplemente no hay plan activo
+      if (!plan) {
+        setError(null);
+      }
     } catch (err) {
       setActivePlan(null);
       setError("Error al cargar el plan activo");

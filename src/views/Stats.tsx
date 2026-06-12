@@ -25,11 +25,10 @@ export default function Stats({ sessions }: { sessions: WorkoutSession[] }) {
     .forEach((s) => {
       s.exercises.forEach((ex) => {
         if (!exMap[ex.name]) exMap[ex.name] = [];
-        const maxW = ex.sets.length ? Math.max(...ex.sets.map((s) => s.w)) : 0;
         exMap[ex.name].push({
           date: s.date,
           label: fmtD(s.date),
-          weight: maxW,
+          weight: ex.weight,
         });
       });
     });
