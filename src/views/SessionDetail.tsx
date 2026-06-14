@@ -145,7 +145,9 @@ export default function SessionDetail({ sessionId, session: initialSession, go }
                 {totalRestSeconds >= 60 ? (
                   <>
                     {Math.floor(totalRestSeconds / 60)}
-                    <span className="text-gray-500 text-sm"> min</span>
+                    <span className="text-gray-500 text-sm">m </span>
+                    {totalRestSeconds % 60}
+                    <span className="text-gray-500 text-sm">s</span>
                   </>
                 ) : (
                   <>

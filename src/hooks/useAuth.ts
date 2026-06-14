@@ -18,9 +18,21 @@ export function useAuth(): UseAuthReturn {
 
   // Escuchar cambios en sessionStorage (cuando el interceptor elimina el token)
   useEffect(() => {
+    let previousToken = sessionStorage.getItem("token");
+
     const checkToken = () => {
       const currentToken = sessionStorage.getItem("token");
-      setToken(currentToken);
+
+      // Si teníamos token y ahora no (el interceptor lo eliminó por 401)
+      if (previousToken && !currentToken) {
+        setToken(null);
+        // Forzar redirección al login
+        window.location.href = "/";
+      } else {
+        setToken(currentToken);
+      }
+
+      previousToken = currentToken;
     };
 
     // Verificar cada segundo si el token sigue existiendo
